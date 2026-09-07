@@ -61,38 +61,3 @@ export class PromptModal extends Modal {
 		this.onSubmit(trimmed);
 	}
 }
-
-export class ConfirmModal extends Modal {
-	private readonly message: string;
-	private readonly onConfirm: () => void;
-
-	constructor(app: App, message: string, onConfirm: () => void) {
-		super(app);
-		this.message = message;
-		this.onConfirm = onConfirm;
-	}
-
-	onOpen(): void {
-		const { contentEl } = this;
-		contentEl.empty();
-		contentEl.createEl('p', { text: this.message });
-
-		new Setting(contentEl)
-			.addButton((btn) =>
-				btn.setButtonText('Отмена').onClick(() => this.close()),
-			)
-			.addButton((btn) =>
-				btn
-					.setButtonText('Удалить')
-					.setWarning()
-					.onClick(() => {
-						this.close();
-						this.onConfirm();
-					}),
-			);
-	}
-
-	onClose(): void {
-		this.contentEl.empty();
-	}
-}

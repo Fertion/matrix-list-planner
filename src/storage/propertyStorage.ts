@@ -70,6 +70,10 @@ function setFrontmatterList(
 	property: string,
 	value: unknown[],
 ): void {
+	if (value.length === 0) {
+		delete frontmatter[property];
+		return;
+	}
 	frontmatter[property] = [...value];
 }
 

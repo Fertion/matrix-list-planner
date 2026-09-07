@@ -10,7 +10,7 @@ import {
 	type QueryController,
 } from 'obsidian';
 import { VIEW_TYPE } from './constants';
-import { buildColumns, buildMatrixSnapshot, displayItemValue } from '../model/listValues';
+import { buildColumns, buildMatrixSnapshot } from '../model/listValues';
 import { insertItemAt, moveItem, removeItemAt } from '../model/moveItem';
 import type {
 	DragItem,
@@ -18,16 +18,28 @@ import type {
 	MatrixSnapshot,
 	MoveOperation,
 } from '../model/types';
+import {
+	DEFAULT_FILE_WIDTH,
+	DEFAULT_POOL_WIDTH,
+	DEFAULT_PROP_WIDTH,
+	FILE_COLUMN_KEY,
+	getColumnWidth,
+	POOL_COLUMN_KEY,
+	readColumnWidths,
+	writeColumnWidths,
+	type ColumnWidths,
+} from '../storage/columnWidths';
 import { applyMoveOperation, writeListProperty } from '../storage/propertyStorage';
 import { readUnassigned, writeUnassigned } from '../storage/unassignedStorage';
 import {
 	renderAddButton,
 	renderFileCell,
 	renderListItem,
+	wireColumnResize,
 	wireDropZone,
 	type MatrixCallbacks,
 } from '../ui/dom';
-import { ConfirmModal, PromptModal } from '../ui/modals';
+import { PromptModal } from '../ui/modals';
 
 export class MatrixListPlannerView extends BasesView implements HoverParent {
 	readonly type = VIEW_TYPE;
@@ -35,8 +47,12 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 
 	private readonly rootEl: HTMLElement;
 	private snapshot: MatrixSnapshot | null = null;
+	private columnWidths: ColumnWidths = {};
 	private writeChain: Promise<void> = Promise.resolve();
 	private isWriting = false;
+	private colEls = new Map<string, HTMLElement>();
+	private poolEl: HTMLElement | null = null;
+	private tableEl: HTMLTableElement | null = null;
 
 	constructor(controller: QueryController, parentEl: HTMLElement) {
 		super(controller);
@@ -58,6 +74,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 	}
 
 	private refreshFromData(): void {
+		this.columnWidths = readColumnWidths(this.config);
 		const order = this.config.getOrder();
 		const columns = buildColumns(order, (id) => this.config.getDisplayName(id));
 		const unassigned = readUnassigned(this.config);
@@ -88,9 +105,44 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 		return entry.file.basename;
 	}
 
+	private applyLiveWidth(key: string, width: number): void {
+		const col = this.colEls.get(key);
+		if (col) {
+			col.style.width = `${width}px`;
+			col.style.minWidth = `${width}px`;
+			col.style.maxWidth = `${width}px`;
+			this.syncTableWidth();
+		}
+		if (key === POOL_COLUMN_KEY && this.poolEl) {
+			this.poolEl.style.width = `${width}px`;
+			this.poolEl.style.minWidth = `${width}px`;
+			this.poolEl.style.maxWidth = `${width}px`;
+		}
+	}
+
+	private syncTableWidth(): void {
+		if (!this.tableEl) return;
+		let sum = 0;
+		for (const [key, el] of this.colEls) {
+			if (key === POOL_COLUMN_KEY) continue;
+			const w = Number.parseFloat(el.style.width);
+			if (Number.isFinite(w)) sum += w;
+		}
+		this.tableEl.style.width = `${sum}px`;
+	}
+
+	private persistColumnWidth(key: string, width: number): void {
+		this.columnWidths = { ...this.columnWidths, [key]: width };
+		writeColumnWidths(this.config, this.columnWidths);
+		this.applyLiveWidth(key, width);
+	}
+
 	private render(): void {
 		const snapshot = this.snapshot;
 		this.rootEl.empty();
+		this.colEls.clear();
+		this.poolEl = null;
+		this.tableEl = null;
 
 		if (!snapshot) {
 			this.rootEl.createDiv({
@@ -109,19 +161,68 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 		}
 
 		const callbacks = this.createCallbacks();
+		const fileWidth = getColumnWidth(
+			this.columnWidths,
+			FILE_COLUMN_KEY,
+			DEFAULT_FILE_WIDTH,
+		);
+		const poolWidth = getColumnWidth(
+			this.columnWidths,
+			POOL_COLUMN_KEY,
+			DEFAULT_POOL_WIDTH,
+		);
 
 		const layout = this.rootEl.createDiv({ cls: 'mlp-layout' });
 		const tableWrap = layout.createDiv({ cls: 'mlp-table-wrap' });
 		const table = tableWrap.createEl('table', { cls: 'mlp-table' });
+		this.tableEl = table;
+
+		const colgroup = table.createEl('colgroup');
+		const fileCol = colgroup.createEl('col');
+		fileCol.style.width = `${fileWidth}px`;
+		fileCol.style.minWidth = `${fileWidth}px`;
+		fileCol.style.maxWidth = `${fileWidth}px`;
+		this.colEls.set(FILE_COLUMN_KEY, fileCol);
+
+		for (const col of snapshot.columns) {
+			const width = getColumnWidth(
+				this.columnWidths,
+				col.propertyName,
+				DEFAULT_PROP_WIDTH,
+			);
+			const el = colgroup.createEl('col');
+			el.style.width = `${width}px`;
+			el.style.minWidth = `${width}px`;
+			el.style.maxWidth = `${width}px`;
+			this.colEls.set(col.propertyName, el);
+		}
+		this.syncTableWidth();
 
 		const thead = table.createEl('thead');
 		const headerRow = thead.createEl('tr');
-		headerRow.createEl('th', { text: 'Файл', cls: 'mlp-th-file' });
+
+		const fileTh = headerRow.createEl('th', {
+			text: 'Файл',
+			cls: 'mlp-th-file',
+		});
+		wireColumnResize(
+			fileTh,
+			FILE_COLUMN_KEY,
+			(key, width) => this.persistColumnWidth(key, width),
+			(width) => this.applyLiveWidth(FILE_COLUMN_KEY, width),
+		);
+
 		for (const col of snapshot.columns) {
-			headerRow.createEl('th', {
+			const th = headerRow.createEl('th', {
 				text: col.displayName,
 				cls: 'mlp-th-prop',
 			});
+			wireColumnResize(
+				th,
+				col.propertyName,
+				(key, width) => this.persistColumnWidth(key, width),
+				(width) => this.applyLiveWidth(col.propertyName, width),
+			);
 		}
 
 		const tbody = table.createEl('tbody');
@@ -163,7 +264,24 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 		}
 
 		const pool = layout.createDiv({ cls: 'mlp-pool' });
-		pool.createDiv({ cls: 'mlp-pool-title', text: 'Нераспределённое' });
+		this.poolEl = pool;
+		pool.style.width = `${poolWidth}px`;
+		pool.style.minWidth = `${poolWidth}px`;
+		pool.style.maxWidth = `${poolWidth}px`;
+
+		const poolTitle = pool.createDiv({ cls: 'mlp-pool-title' });
+		poolTitle.createSpan({ text: 'Нераспределённое' });
+		wireColumnResize(
+			poolTitle,
+			POOL_COLUMN_KEY,
+			(key, width) => this.persistColumnWidth(key, width),
+			(width) => this.applyLiveWidth(POOL_COLUMN_KEY, width),
+			{
+				edge: 'left',
+				getStartWidth: () => pool.getBoundingClientRect().width,
+			},
+		);
+
 		const poolBody = pool.createDiv({ cls: 'mlp-pool-body' });
 		this.renderCell(
 			poolBody,
@@ -187,16 +305,18 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 
 		const listEl = cellEl.createDiv({ cls: 'mlp-cell-list' });
 
-		if (items.length === 0) {
-			listEl.createDiv({
-				cls: 'mlp-cell-placeholder',
-				text: 'Перетащите сюда',
+		items.forEach((value, index) => {
+			renderListItem(listEl, value, index, source, callbacks);
+		});
+
+		renderAddButton(listEl, () => {
+			callbacks.onAdd({
+				targetType: source.sourceType,
+				targetFilePath: source.sourceFilePath,
+				targetProperty: source.sourceProperty,
+				targetIndex: items.length,
 			});
-		} else {
-			items.forEach((value, index) => {
-				renderListItem(listEl, value, index, source, callbacks);
-			});
-		}
+		});
 
 		wireDropZone(
 			cellEl,
@@ -207,17 +327,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 			},
 			() => items.length,
 			callbacks,
-		);
-
-		renderAddButton(cellEl, '+ Добавить', () => {
-			callbacks.onAdd({
-				targetType: source.sourceType,
-				targetFilePath: source.sourceFilePath,
-				targetProperty: source.sourceProperty,
-				targetIndex: items.length,
-			});
-		});
-	}
+		);	}
 
 	private createCallbacks(): MatrixCallbacks {
 		return {
@@ -228,11 +338,14 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 				this.handleAdd(target);
 			},
 			onDelete: (drag) => {
-				this.handleDelete(drag);
+				void this.handleDelete(drag);
 			},
 			onOpenFile: (filePath, event) => {
 				const modEvent = Keymap.isModEvent(event);
 				void this.app.workspace.openLinkText(filePath, '', modEvent);
+			},
+			onColumnResize: (key, width) => {
+				this.persistColumnWidth(key, width);
 			},
 		};
 	}
@@ -349,48 +462,45 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 		}).open();
 	}
 
-	private handleDelete(drag: DragItem): void {
-		const label = displayItemValue(drag.value) || 'этот элемент';
-		new ConfirmModal(this.app, `Удалить «${label}»?`, () => {
-			void this.enqueueWrite(async () => {
-				try {
-					if (drag.sourceType === 'unassigned') {
-						const next = removeItemAt(this.getUnassigned(), drag.sourceIndex);
-						if (!next) return;
-						writeUnassigned(this.config, next);
-						if (this.snapshot) {
-							this.snapshot.unassigned = next;
-							this.render();
-						}
-						return;
-					}
-
-					if (!drag.sourceFilePath || !drag.sourceProperty) return;
-					const current = this.getCellItems(
-						drag.sourceFilePath,
-						drag.sourceProperty,
-					);
-					const next = removeItemAt(current, drag.sourceIndex);
+	private async handleDelete(drag: DragItem): Promise<void> {
+		await this.enqueueWrite(async () => {
+			try {
+				if (drag.sourceType === 'unassigned') {
+					const next = removeItemAt(this.getUnassigned(), drag.sourceIndex);
 					if (!next) return;
-					await writeListProperty(
-						this.app,
-						drag.sourceFilePath,
-						drag.sourceProperty,
-						next,
-					);
-					const row = this.snapshot?.rows.find(
-						(r) => r.filePath === drag.sourceFilePath,
-					);
-					if (row) {
-						row.cells[drag.sourceProperty] = next;
+					writeUnassigned(this.config, next);
+					if (this.snapshot) {
+						this.snapshot.unassigned = next;
 						this.render();
 					}
-				} catch (error) {
-					console.error(error);
-					new Notice('Не удалось удалить элемент.');
-					this.refreshFromData();
+					return;
 				}
-			});
-		}).open();
+
+				if (!drag.sourceFilePath || !drag.sourceProperty) return;
+				const current = this.getCellItems(
+					drag.sourceFilePath,
+					drag.sourceProperty,
+				);
+				const next = removeItemAt(current, drag.sourceIndex);
+				if (!next) return;
+				await writeListProperty(
+					this.app,
+					drag.sourceFilePath,
+					drag.sourceProperty,
+					next,
+				);
+				const row = this.snapshot?.rows.find(
+					(r) => r.filePath === drag.sourceFilePath,
+				);
+				if (row) {
+					row.cells[drag.sourceProperty] = next;
+					this.render();
+				}
+			} catch (error) {
+				console.error(error);
+				new Notice('Не удалось удалить элемент.');
+				this.refreshFromData();
+			}
+		});
 	}
 }
