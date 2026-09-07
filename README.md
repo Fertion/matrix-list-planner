@@ -2,6 +2,9 @@
 
 An Obsidian.md plugin that provides a Bases view for drag-and-drop distribution of list-property items across files and an unassigned pool.
 
+<img width="1546" height="357" alt="image" src="https://github.com/user-attachments/assets/f95c36e3-2a0f-4ae0-9119-4af790e60123" />
+
+
 A custom **Obsidian Bases View** for visually distributing `list` property items using Drag & Drop.
 
 ### How it works
