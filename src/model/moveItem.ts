@@ -126,6 +126,17 @@ export function removeItemAt(items: unknown[], index: number): unknown[] | null 
 	return next;
 }
 
+export function replaceItemAt(
+	items: unknown[],
+	index: number,
+	value: unknown,
+): unknown[] | null {
+	if (index < 0 || index >= items.length) return null;
+	const next = [...items];
+	next[index] = value;
+	return next;
+}
+
 export function insertItemAt(
 	items: unknown[],
 	index: number,

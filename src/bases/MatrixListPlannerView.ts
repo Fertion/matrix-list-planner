@@ -10,8 +10,8 @@ import {
 	type QueryController,
 } from 'obsidian';
 import { VIEW_TYPE } from './constants';
-import { buildColumns, buildMatrixSnapshot } from '../model/listValues';
-import { insertItemAt, moveItem, removeItemAt } from '../model/moveItem';
+import { buildColumns, buildMatrixSnapshot, displayItemValue } from '../model/listValues';
+import { insertItemAt, moveItem, removeItemAt, replaceItemAt } from '../model/moveItem';
 import type {
 	DragItem,
 	DropTarget,
@@ -40,6 +40,7 @@ import {
 	type MatrixCallbacks,
 } from '../ui/dom';
 import { PromptModal } from '../ui/modals';
+import { t } from '../i18n';
 
 export class MatrixListPlannerView extends BasesView implements HoverParent {
 	readonly type = VIEW_TYPE;
@@ -147,7 +148,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 		if (!snapshot) {
 			this.rootEl.createDiv({
 				cls: 'mlp-empty',
-				text: 'Загрузка…',
+				text: t('loading'),
 			});
 			return;
 		}
@@ -155,7 +156,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 		if (snapshot.columns.length === 0) {
 			this.rootEl.createDiv({
 				cls: 'mlp-empty',
-				text: 'Выберите list-свойства в меню Properties — они станут колонками матрицы.',
+				text: t('selectListProperties'),
 			});
 			return;
 		}
@@ -202,7 +203,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 		const headerRow = thead.createEl('tr');
 
 		const fileTh = headerRow.createEl('th', {
-			text: 'Файл',
+			text: t('file'),
 			cls: 'mlp-th-file',
 		});
 		wireColumnResize(
@@ -233,7 +234,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 				cls: 'mlp-empty-cell',
 				attr: { colspan: String(snapshot.columns.length + 1) },
 			});
-			emptyCell.setText('Нет файлов по текущему фильтру bases.');
+			emptyCell.setText(t('noFiles'));
 		} else {
 			for (const row of snapshot.rows) {
 				const tr = tbody.createEl('tr', { cls: 'mlp-row' });
@@ -270,7 +271,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 		pool.style.maxWidth = `${poolWidth}px`;
 
 		const poolTitle = pool.createDiv({ cls: 'mlp-pool-title' });
-		poolTitle.createSpan({ text: 'Нераспределённое' });
+		poolTitle.createSpan({ text: t('unassigned') });
 		wireColumnResize(
 			poolTitle,
 			POOL_COLUMN_KEY,
@@ -319,7 +320,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 		});
 
 		wireDropZone(
-			cellEl,
+			isPool ? cellEl : parent,
 			{
 				targetType: source.sourceType,
 				targetFilePath: source.sourceFilePath,
@@ -327,7 +328,8 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 			},
 			() => items.length,
 			callbacks,
-		);	}
+		);
+	}
 
 	private createCallbacks(): MatrixCallbacks {
 		return {
@@ -336,6 +338,9 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 			},
 			onAdd: (target) => {
 				this.handleAdd(target);
+			},
+			onRename: (drag) => {
+				this.handleRename(drag);
 			},
 			onDelete: (drag) => {
 				void this.handleDelete(drag);
@@ -414,52 +419,115 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 				}
 			} catch (error) {
 				console.error(error);
-				new Notice('Не удалось сохранить перемещение. Обновляю вид.');
+				new Notice(t('saveMoveFailed'));
 				this.refreshFromData();
 			}
 		});
 	}
 
 	private handleAdd(target: DropTarget): void {
-		new PromptModal(this.app, 'Добавить элемент', 'Введите значение', (value) => {
-			void this.enqueueWrite(async () => {
-				try {
-					if (target.targetType === 'unassigned') {
-						const next = insertItemAt(this.getUnassigned(), target.targetIndex, value);
-						writeUnassigned(this.config, next);
-						if (this.snapshot) {
-							this.snapshot.unassigned = next;
+		new PromptModal(
+			this.app,
+			{
+				title: t('addItemTitle'),
+				placeholder: t('enterValue'),
+				submitLabel: t('addSubmit'),
+			},
+			(value) => {
+				void this.enqueueWrite(async () => {
+					try {
+						if (target.targetType === 'unassigned') {
+							const next = insertItemAt(this.getUnassigned(), target.targetIndex, value);
+							writeUnassigned(this.config, next);
+							if (this.snapshot) {
+								this.snapshot.unassigned = next;
+								this.render();
+							}
+							return;
+						}
+
+						if (!target.targetFilePath || !target.targetProperty) return;
+						const current = this.getCellItems(
+							target.targetFilePath,
+							target.targetProperty,
+						);
+						const next = insertItemAt(current, target.targetIndex, value);
+						await writeListProperty(
+							this.app,
+							target.targetFilePath,
+							target.targetProperty,
+							next,
+						);
+						const row = this.snapshot?.rows.find(
+							(r) => r.filePath === target.targetFilePath,
+						);
+						if (row) {
+							row.cells[target.targetProperty] = next;
 							this.render();
 						}
-						return;
+					} catch (error) {
+						console.error(error);
+						new Notice(t('addFailed'));
+						this.refreshFromData();
 					}
+				});
+			},
+		).open();
+	}
 
-					if (!target.targetFilePath || !target.targetProperty) return;
-					const current = this.getCellItems(
-						target.targetFilePath,
-						target.targetProperty,
-					);
-					const next = insertItemAt(current, target.targetIndex, value);
-					await writeListProperty(
-						this.app,
-						target.targetFilePath,
-						target.targetProperty,
-						next,
-					);
-					const row = this.snapshot?.rows.find(
-						(r) => r.filePath === target.targetFilePath,
-					);
-					if (row) {
-						row.cells[target.targetProperty] = next;
-						this.render();
+	private handleRename(drag: DragItem): void {
+		const currentLabel = displayItemValue(drag.value);
+		new PromptModal(
+			this.app,
+			{
+				title: t('renameItemTitle'),
+				placeholder: t('enterValue'),
+				submitLabel: t('save'),
+				initialValue: currentLabel,
+			},
+			(value) => {
+				if (value === currentLabel) return;
+				void this.enqueueWrite(async () => {
+					try {
+						if (drag.sourceType === 'unassigned') {
+							const next = replaceItemAt(this.getUnassigned(), drag.sourceIndex, value);
+							if (!next) return;
+							writeUnassigned(this.config, next);
+							if (this.snapshot) {
+								this.snapshot.unassigned = next;
+								this.render();
+							}
+							return;
+						}
+
+						if (!drag.sourceFilePath || !drag.sourceProperty) return;
+						const current = this.getCellItems(
+							drag.sourceFilePath,
+							drag.sourceProperty,
+						);
+						const next = replaceItemAt(current, drag.sourceIndex, value);
+						if (!next) return;
+						await writeListProperty(
+							this.app,
+							drag.sourceFilePath,
+							drag.sourceProperty,
+							next,
+						);
+						const row = this.snapshot?.rows.find(
+							(r) => r.filePath === drag.sourceFilePath,
+						);
+						if (row) {
+							row.cells[drag.sourceProperty] = next;
+							this.render();
+						}
+					} catch (error) {
+						console.error(error);
+						new Notice(t('renameFailed'));
+						this.refreshFromData();
 					}
-				} catch (error) {
-					console.error(error);
-					new Notice('Не удалось добавить элемент.');
-					this.refreshFromData();
-				}
-			});
-		}).open();
+				});
+			},
+		).open();
 	}
 
 	private async handleDelete(drag: DragItem): Promise<void> {
@@ -498,7 +566,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 				}
 			} catch (error) {
 				console.error(error);
-				new Notice('Не удалось удалить элемент.');
+				new Notice(t('deleteFailed'));
 				this.refreshFromData();
 			}
 		});

@@ -1,4 +1,5 @@
 import { Menu, Platform, setIcon, type App } from 'obsidian';
+import { t } from '../i18n';
 import { displayItemValue } from '../model/listValues';
 import type { DragItem, DropTarget } from '../model/types';
 import { DRAG_MIME } from '../model/types';
@@ -7,6 +8,7 @@ import { ABS_MIN_COLUMN_WIDTH } from '../storage/columnWidths';
 export type MatrixCallbacks = {
 	onDrop: (drag: DragItem, drop: DropTarget) => void;
 	onAdd: (target: DropTarget) => void;
+	onRename: (drag: DragItem) => void;
 	onDelete: (drag: DragItem) => void;
 	onOpenFile: (filePath: string, event: MouseEvent) => void;
 	onColumnResize: (key: string, width: number) => void;
@@ -71,12 +73,12 @@ function resolveDropTarget(
 
 	const itemEl = el.closest('.mlp-item:not(.mlp-item--add)');
 	if (itemEl instanceof HTMLElement && itemEl.dataset.dropIndex != null) {
-		const cell = itemEl.closest('.mlp-cell');
+		const cell = itemEl.closest('[data-container-type]');
 		if (!(cell instanceof HTMLElement)) return null;
 		return dropTargetFromCell(cell, Number(itemEl.dataset.dropIndex));
 	}
 
-	const cell = el.closest('.mlp-cell');
+	const cell = el.closest('[data-container-type]');
 	if (!(cell instanceof HTMLElement)) return null;
 
 	const list = cell.querySelector('.mlp-cell-list');
@@ -124,7 +126,7 @@ export function renderListItem(
 
 	const deleteBtn = itemEl.createEl('button', {
 		cls: 'mlp-item-delete clickable-icon',
-		attr: { 'aria-label': 'Удалить', type: 'button' },
+		attr: { 'aria-label': t('delete'), type: 'button' },
 	});
 	setIcon(deleteBtn, 'x');
 
@@ -156,7 +158,12 @@ export function renderListItem(
 			evt.preventDefault();
 			const menu = new Menu();
 			menu.addItem((menuItem) => {
-				menuItem.setTitle('Удалить').setIcon('trash').onClick(() => {
+				menuItem.setTitle(t('rename')).setIcon('pencil').onClick(() => {
+					callbacks.onRename(dragItem);
+				});
+			});
+			menu.addItem((menuItem) => {
+				menuItem.setTitle(t('delete')).setIcon('trash').onClick(() => {
 					callbacks.onDelete(dragItem);
 				});
 			});
@@ -275,7 +282,7 @@ function wireTouchDrag(
 					updateItemDropIndicator(overItem, overIndex, evt.clientX);
 				}
 			} else {
-				const cell = under.closest('.mlp-cell');
+				const cell = under.closest('[data-container-type]');
 				if (cell instanceof HTMLElement) {
 					cell.classList.add('mlp-drop-target');
 				}
@@ -370,8 +377,8 @@ export function renderAddButton(
 		cls: 'mlp-item mlp-item--add',
 		attr: {
 			type: 'button',
-			'aria-label': 'Добавить',
-			title: 'Добавить',
+			'aria-label': t('add'),
+			title: t('add'),
 		},
 	});
 	setIcon(btn, 'plus');
@@ -424,7 +431,7 @@ export function wireColumnResize(
 			edge === 'left'
 				? 'mlp-col-resize mlp-col-resize--left'
 				: 'mlp-col-resize',
-		attr: { title: 'Изменить ширину' },
+		attr: { title: t('resizeColumn') },
 	});
 
 	handle.addEventListener('pointerdown', (evt) => {

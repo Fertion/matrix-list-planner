@@ -79,6 +79,15 @@
 	padding: 8px 10px;
 }
 
+/* Make percentage heights on cell contents resolve to the full row height */
+.mlp-row {
+	height: 1px;
+}
+
+.mlp-td-cell {
+	height: 100%;
+}
+
 .mlp-file-link {
 	cursor: pointer;
 	word-break: break-word;
@@ -109,7 +118,9 @@
 .mlp-cell {
 	display: flex;
 	flex-direction: column;
+	align-self: stretch;
 	min-height: 40px;
+	height: 100%;
 	padding: 6px 8px;
 	box-sizing: border-box;
 }
@@ -266,6 +277,7 @@ body.is-mobile .mlp-item-delete {
 }
 
 .mlp-pool-body {
+	display: grid;
 	flex: 1;
 	overflow: auto;
 	min-height: 0;
