@@ -253,9 +253,13 @@ body.is-mobile .mlp-item-delete {
 }
 
 .mlp-pool {
+	--mlp-pool-width: 240px;
 	display: flex;
 	flex-direction: column;
 	flex-shrink: 0;
+	width: var(--mlp-pool-width);
+	min-width: var(--mlp-pool-width);
+	max-width: var(--mlp-pool-width);
 	border-left: 1px solid var(--background-modifier-border);
 	background: var(--background-secondary);
 	min-height: 0;
@@ -325,9 +329,9 @@ body.is-mobile .mlp-layout {
 }
 
 body.is-mobile .mlp-pool {
-	width: 100% !important;
-	max-width: none !important;
-	min-width: 0 !important;
+	width: 100%;
+	max-width: none;
+	min-width: 0;
 	max-height: 40%;
 	border-left: none;
 	border-top: 1px solid var(--background-modifier-border);

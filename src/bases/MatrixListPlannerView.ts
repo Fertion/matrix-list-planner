@@ -115,9 +115,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 			this.syncTableWidth();
 		}
 		if (key === POOL_COLUMN_KEY && this.poolEl) {
-			this.poolEl.style.width = `${width}px`;
-			this.poolEl.style.minWidth = `${width}px`;
-			this.poolEl.style.maxWidth = `${width}px`;
+			this.poolEl.style.setProperty('--mlp-pool-width', `${width}px`);
 		}
 	}
 
@@ -266,9 +264,7 @@ export class MatrixListPlannerView extends BasesView implements HoverParent {
 
 		const pool = layout.createDiv({ cls: 'mlp-pool' });
 		this.poolEl = pool;
-		pool.style.width = `${poolWidth}px`;
-		pool.style.minWidth = `${poolWidth}px`;
-		pool.style.maxWidth = `${poolWidth}px`;
+		pool.style.setProperty('--mlp-pool-width', `${poolWidth}px`);
 
 		const poolTitle = pool.createDiv({ cls: 'mlp-pool-title' });
 		poolTitle.createSpan({ text: t('unassigned') });
