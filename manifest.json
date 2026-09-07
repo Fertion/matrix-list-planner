@@ -1,7 +1,7 @@
 {
 	"id": "matrix-list-planner",
 	"name": "Matrix List Planner",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"minAppVersion": "1.10.0",
 	"description": "Bases view for drag-and-drop distribution of list property items across files and an unassigned pool.",
 	"author": "Fertion",
