@@ -1,11 +1,10 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "matrix-list-planner",
+	"name": "Matrix List Planner",
 	"version": "1.0.0",
-	"minAppVersion": "1.0.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"minAppVersion": "1.10.0",
+	"description": "Bases view for drag-and-drop distribution of list property items across files and an unassigned pool.",
+	"author": "DmitryFert",
+	"authorUrl": "",
 	"isDesktopOnly": false
 }

@@ -1,8 +1,259 @@
-/*
+/* Matrix List Planner */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.mlp-root {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	padding: 0;
+	overflow: hidden;
+}
 
-If your plugin does not need CSS, delete this file.
+.mlp-layout {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+	min-width: 0;
+	gap: 0;
+}
 
-*/
+.mlp-table-wrap {
+	flex: 1;
+	min-width: 0;
+	overflow: auto;
+}
+
+.mlp-table {
+	width: max-content;
+	min-width: 100%;
+	border-collapse: separate;
+	border-spacing: 0;
+	table-layout: fixed;
+}
+
+.mlp-table th,
+.mlp-table td {
+	border-bottom: 1px solid var(--background-modifier-border);
+	border-right: 1px solid var(--background-modifier-border);
+	vertical-align: top;
+	padding: 0;
+}
+
+.mlp-th-file,
+.mlp-td-file {
+	position: sticky;
+	left: 0;
+	z-index: 2;
+	background: var(--background-primary);
+	min-width: 140px;
+	max-width: 220px;
+	width: 180px;
+}
+
+.mlp-table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	background: var(--background-secondary);
+	font-weight: var(--font-medium);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	text-align: left;
+	padding: 8px 10px;
+	white-space: nowrap;
+}
+
+.mlp-table thead .mlp-th-file {
+	z-index: 4;
+}
+
+.mlp-th-prop {
+	min-width: 160px;
+	width: 180px;
+}
+
+.mlp-td-file {
+	padding: 8px 10px;
+}
+
+.mlp-file-link {
+	cursor: pointer;
+	word-break: break-word;
+}
+
+.mlp-td-cell {
+	min-width: 160px;
+	width: 180px;
+}
+
+.mlp-cell {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-height: 72px;
+	padding: 8px;
+	box-sizing: border-box;
+}
+
+.mlp-cell-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	flex: 1;
+	min-height: 40px;
+}
+
+.mlp-cell-placeholder {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	padding: 10px 8px;
+	border: 1px dashed var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	text-align: center;
+}
+
+.mlp-item {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 6px 8px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	cursor: grab;
+	user-select: none;
+	touch-action: none;
+}
+
+.mlp-item:active {
+	cursor: grabbing;
+}
+
+.mlp-item-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--font-ui-small);
+}
+
+.mlp-item-delete {
+	opacity: 0;
+	flex-shrink: 0;
+	padding: 2px;
+	margin: 0;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.mlp-item:hover .mlp-item-delete,
+.mlp-item:focus-within .mlp-item-delete {
+	opacity: 1;
+}
+
+.mlp-item-delete:hover {
+	color: var(--text-error);
+}
+
+.mlp-item--dragging {
+	opacity: 0.45;
+}
+
+.mlp-drop-before {
+	box-shadow: inset 0 2px 0 0 var(--interactive-accent);
+}
+
+.mlp-drop-after {
+	box-shadow: inset 0 -2px 0 0 var(--interactive-accent);
+}
+
+.mlp-drop-target {
+	background: var(--background-modifier-hover);
+	outline: 1px dashed var(--interactive-accent);
+	outline-offset: -2px;
+}
+
+.mlp-add-btn {
+	align-self: flex-start;
+	appearance: none;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	padding: 2px 4px;
+	cursor: pointer;
+	border-radius: var(--radius-s);
+}
+
+.mlp-add-btn:hover {
+	color: var(--text-normal);
+	background: var(--background-modifier-hover);
+}
+
+.mlp-pool {
+	display: flex;
+	flex-direction: column;
+	width: 240px;
+	min-width: 200px;
+	max-width: 320px;
+	flex-shrink: 0;
+	border-left: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	min-height: 0;
+}
+
+.mlp-pool-title {
+	padding: 10px 12px;
+	font-weight: var(--font-medium);
+	font-size: var(--font-ui-small);
+	border-bottom: 1px solid var(--background-modifier-border);
+	position: sticky;
+	top: 0;
+	background: var(--background-secondary);
+	z-index: 1;
+}
+
+.mlp-pool-body {
+	flex: 1;
+	overflow: auto;
+	min-height: 0;
+}
+
+.mlp-cell--pool {
+	min-height: 100%;
+}
+
+.mlp-empty,
+.mlp-empty-cell {
+	padding: 24px 16px;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+body.mlp-dragging {
+	cursor: grabbing;
+}
+
+@media (max-width: 700px) {
+	.mlp-layout {
+		flex-direction: column;
+	}
+
+	.mlp-pool {
+		width: 100%;
+		max-width: none;
+		min-width: 0;
+		max-height: 40%;
+		border-left: none;
+		border-top: 1px solid var(--background-modifier-border);
+	}
+
+	.mlp-th-prop,
+	.mlp-td-cell {
+		min-width: 140px;
+		width: 140px;
+	}
+}
